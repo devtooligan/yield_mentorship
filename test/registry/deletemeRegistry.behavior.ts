@@ -1,6 +1,6 @@
 import { expect } from "chai";
 
-export function shouldBehaveLikeGreeter(): void {
+export function shouldBehaveLikeRegistry(): void {
   it("should return the new greeting once it's changed", async function () {
     expect(await this.greeter.connect(this.signers.admin).greet()).to.equal("Hello, world!");
 
