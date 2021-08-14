@@ -36,7 +36,9 @@ describe("Registry Unit tests", function () {
     });
 
     it("#claimName() should allow unclaimed names to be claimed", async function () {
-      await this.registry.connect(user).claimName(name);
+      await expect(this.registry.connect(user).claimName(name))
+        .to.emit(this.registry, "NameClaimed")
+        .withArgs(name, user.address);
 
       const newOwner = await this.registry.claimedNames(name);
       expect(newOwner).to.be.equal(user.address);
@@ -88,7 +90,9 @@ describe("Registry Unit tests", function () {
       });
 
       it("#releaseName() should allow user to release a name they own", async function () {
-        await this.registry.connect(user).releaseName(name);
+        await expect(this.registry.connect(user).releaseName(name))
+          .to.emit(this.registry, "NameReleased")
+          .withArgs(name, user.address);
 
         const currentOwner = await this.registry.claimedNames(name);
         expect(currentOwner, "0x0000000000000000000000000000000000000000");
