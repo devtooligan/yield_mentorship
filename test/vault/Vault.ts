@@ -39,13 +39,11 @@ describe("Vault Unit tests", function () {
 
   describe("with no balances", function () {
     it("#withdraw() should not be able to withdraw without a balance", async function () {
-      await expect(this.vault.connect(user1).withdraw(withdrawAmount)).to.be.reverted;
-      // ^^ I couldn't figure out how to access the ERC-20 generated error message here
-      // Is there a way?  How can I learn more about this?
+      await expect(this.vault.connect(user1).withdraw(withdrawAmount)).to.be.revertedWith("Insufficent balance");
     });
 
     it("#deposit() should not be able to deposit without approving first", async function () {
-      await expect(this.vault.connect(user1).deposit(depositAmount)).to.be.revertedWith("Approve deposit first");
+      await expect(this.vault.connect(user1).deposit(depositAmount)).to.be.revertedWith("ERC20: Insufficient approval");
     });
 
     describe("with approved amounts", function () {
@@ -55,7 +53,9 @@ describe("Vault Unit tests", function () {
       });
 
       it("#deposit() should not be able to deposit more than approved", async function () {
-        await expect(this.vault.connect(user1).deposit(depositAmount + 10)).to.be.revertedWith("Approve deposit first");
+        await expect(this.vault.connect(user1).deposit(depositAmount + 10)).to.be.revertedWith(
+          "ERC20: Insufficient approval",
+        );
       });
 
       it("#deposit() should allow deposits from one or more users", async function () {

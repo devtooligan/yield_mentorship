@@ -20,9 +20,8 @@ contract Vault {
     }
 
     function deposit(uint256 amount) external {
-        require(_token.allowance(msg.sender, address(this)) >= amount, "Approve deposit first");
-        _token.transferFrom(msg.sender, address(this), amount);
         balances[msg.sender] += amount;
+        _token.transferFrom(msg.sender, address(this), amount);
         emit Deposit(amount);
     }
 
