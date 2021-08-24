@@ -2,7 +2,7 @@ import hre from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import { Signers } from "../types";
 import { expect } from "chai";
-import { TooliganToken } from "../../typechain";
+import { TooliganToken, Vault } from "../../typechain";
 
 const { deployContract } = hre.waffle;
 
@@ -32,7 +32,7 @@ describe("Vault Unit tests", function () {
     );
     await this.token.mint(user1.address, 10000);
     await this.token.mint(user2.address, 10000);
-    this.vault = <TooliganToken>(
+    this.vault = <Vault>(
       await deployContract(this.signers.admin, await hre.artifacts.readArtifact("Vault"), [this.token.address])
     );
   });
