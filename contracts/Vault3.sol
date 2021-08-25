@@ -4,7 +4,7 @@ pragma solidity >=0.8.4;
 import "@yield-protocol/utils-v2/contracts/token/ERC20.sol";
 import "@yield-protocol/utils-v2/contracts/token/IERC20.sol";
 
-// @title NewVault
+// @title Vault3
 // @dev Standard vault for single ERC-20 token type - part of an excercise for the Yield mentorship
 //  Issues TooliganVaultToken ERC20 tokens for deposits
 contract Vault3 is ERC20("TooliganVaultToken", "TVT", 18) {
