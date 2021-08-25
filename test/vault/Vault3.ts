@@ -81,12 +81,14 @@ describe("Vault3 Unit tests", function () {
       });
 
       it("#deposit() should handle deposits at varying exchange rates", async function () {
+        // Using initialExchangeRate
         await expect(this.vault.connect(user1).deposit(1000)).to.emit(this.vault, "Deposit").withArgs(1000);
         let currentVaultTokenBalance = 1000 * initialExchangeRate;
         let currentToolieTokenBalance = mintAmount - 1000;
         expect(await this.vault.balanceOf(user1.address)).to.be.equal(currentVaultTokenBalance);
         expect(await this.toolieToken.balanceOf(user1.address)).to.be.equal(currentToolieTokenBalance);
 
+        // Using exchangeRate1
         await this.vault.connect(this.signers.admin).setExchangeRate(exchangeRateWad1);
         await this.toolieToken.connect(user1).approve(this.vault.address, 1000);
         await this.vault.connect(user1).deposit(1000);
@@ -95,6 +97,7 @@ describe("Vault3 Unit tests", function () {
         expect(await this.vault.balanceOf(user1.address)).to.be.equal(currentVaultTokenBalance);
         expect(await this.toolieToken.balanceOf(user1.address)).to.be.equal(currentToolieTokenBalance);
 
+        // Using exchangeRate2
         await this.vault.connect(this.signers.admin).setExchangeRate(exchangeRateWad2);
         await this.toolieToken.connect(user1).approve(this.vault.address, 1000);
         await this.vault.connect(user1).deposit(1000);
@@ -119,6 +122,7 @@ describe("Vault3 Unit tests", function () {
     });
 
     it("#withdraw() should be able to withdraw less than the amount of vault tokens held at varying exchange rates", async function () {
+      // Using initialExchangeRate
       await this.vault.connect(user1).approve(this.vault.address, 1000);
       await expect(this.vault.connect(user1).withdraw(1000)).to.emit(this.vault, "Withdraw").withArgs(1000);
       currentToolieTokenBalance += 1000;
@@ -127,6 +131,7 @@ describe("Vault3 Unit tests", function () {
       expect(await this.vault.balanceOf(user1.address)).to.be.equal(currentVaultTokenBalance);
       expect(await this.vault.totalSupply()).to.be.equal(currentVaultTokenBalance);
 
+      // Using exchangeRate1
       await this.vault.connect(this.signers.admin).setExchangeRate(exchangeRateWad1);
       await this.vault.connect(user1).approve(this.vault.address, 1000);
       await this.vault.connect(user1).withdraw(1000);
@@ -136,6 +141,7 @@ describe("Vault3 Unit tests", function () {
       expect(await this.vault.balanceOf(user1.address)).to.be.equal(currentVaultTokenBalance);
       expect(await this.vault.totalSupply()).to.be.equal(currentVaultTokenBalance);
 
+      // Using exchangeRate2
       await this.vault.connect(this.signers.admin).setExchangeRate(exchangeRateWad2);
       await this.vault.connect(user1).approve(this.vault.address, 1000);
       await this.vault.connect(user1).withdraw(200);
