@@ -62,7 +62,6 @@ contract Vault3 is ERC20("TooliganVaultToken", "TVT", 18) {
     function withdraw(uint256 wad) external {
         require(wad > 0, "Amount must be > 0");
         _burn(msg.sender, _applyExchangeRate(wad));
-        _token.approve(msg.sender, wad);
         _token.transfer(msg.sender, wad);
         emit Withdraw(wad);
     }

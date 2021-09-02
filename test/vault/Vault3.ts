@@ -1,4 +1,5 @@
 import hre from "hardhat";
+import { BigNumber } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/dist/src/signer-with-address";
 import { Signers } from "../types";
 import { expect } from "chai";
@@ -11,12 +12,13 @@ describe("Vault3 Unit tests", function () {
 
   let user1: SignerWithAddress; // assigned to this.signers[1]
   let user2: SignerWithAddress; // assigned to this.signers[2]
-  const mintAmount: number = 10000; // user1 and user2 mint this many Toolies
-  const initialExchangeRate: number = 1.1;
-  const exchangeRate1: number = 0.5;
-  const exchangeRate2: number = 4.0;
-  const exchangeRateWad1: string = (exchangeRate1 * 10 ** 18).toString();
-  const exchangeRateWad2: string = (exchangeRate2 * 10 ** 18).toString();
+  const mintAmount = 10000; // user1 and user2 mint this many Toolies
+  const initialExchangeRate = 1.1;
+  const exchangeRate1 = 0.5;
+  const exchangeRate2 = 4.0;
+  const WAD = BigNumber.from("1" + "0".repeat(18));
+  const exchangeRateWad1 = WAD.mul(5).div(10);
+  const exchangeRateWad2 = WAD.mul(4);
 
   before(async function () {
     const signers: SignerWithAddress[] = await hre.ethers.getSigners();
@@ -59,15 +61,14 @@ describe("Vault3 Unit tests", function () {
         .withArgs(exchangeRateWad1);
     });
 
+    it("#withdraw() should not be able to withdraw without holding vault tokens", async function () {
+      await expect(this.vault.connect(user1).withdraw(500)).to.be.revertedWith("ERC20: Insufficient balance");
+    });
+
     describe("with approved amounts", function () {
       beforeEach(async function () {
-        await this.vault.connect(user1).approve(this.vault.address, 500);
         await this.toolieToken.connect(user1).approve(this.vault.address, 1000);
         await this.toolieToken.connect(user2).approve(this.vault.address, 5000);
-      });
-
-      it("#withdraw() should not be able to withdraw without holding vault tokens", async function () {
-        await expect(this.vault.connect(user1).withdraw(500)).to.be.revertedWith("ERC20: Insufficient balance");
       });
 
       it("#deposit() should allow deposits from one or more users", async function () {
