@@ -4,16 +4,16 @@ pragma solidity >=0.8.4;
 import "./Dai.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
-// @title  Collateralized Vault
-// @notice Deposit Eth - Borrow Dai - Repay Dai - Withdraw Eth
+// @title  Collateralized Vault - An exercise for the Yield Mentorship program
+// @notice Deposit Eth - Borrow Dai - Repay Dai - Withdraw Eth -- Liquidate
 contract Vault4 {
     Dai public token;
     AggregatorV3Interface internal priceFeed;
 
     address public owner;
 
-    mapping(address => uint256) public deposits; // Stored in eth
-    mapping(address => uint256) public loans; // Stored in dai
+    mapping(address => uint256) public deposits; // Amounts in eth
+    mapping(address => uint256) public loans; // Amounts in dai
 
     //@notice The eth/dai exchange rate from oracle
     uint256 public exchangeRate;
@@ -24,16 +24,15 @@ contract Vault4 {
     event Repay(uint256 wad);
     event Liquidate(address guy, uint256 loanDaiAmt, uint256 depositEthAmt);
 
-    // @dev Deploy with address of Dai Stablecoin token
+    // @dev Deploy with addresses of Dai Stablecoin token and Chainlink Price Feed aggregator
     constructor(Dai _token, address _oracleAddress) {
         token = _token;
         owner = msg.sender;
         priceFeed = AggregatorV3Interface(_oracleAddress);
     }
 
-    //@notice Function used to get dai/eth exchange from price feed and convert eth to dai
-    //@param wad amount to apply exchange rate to
-    //@param update If true, will fetch exchange rate from oracle
+    //@notice Function used to get latest dai/eth exchange from price feed and convert eth to dai
+    //@param _ethValue amount to apply exchange rate to
     function applyExchangeRate(uint256 _ethValue) internal view returns (uint256 _resultDai) {
         (, int256 answer, , , ) = priceFeed.latestRoundData();
         require(answer > 0, "Amount > 0 required");
