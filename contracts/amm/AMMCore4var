@@ -1,0 +1,122 @@
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.8.4;
+
+import "@yield-protocol/utils-v2/contracts/token/ERC20.sol";
+import "@yield-protocol/utils-v2/contracts/token/IERC20.sol";
+
+import "hardhat/console.sol";  // DELETE MEEEEEEEEEEEEEEEEEE!!!!
+
+/// @title AMMRouter
+/// @author devtooligan.eth
+/// @notice Simple Automated Market Maker - Core logic contract. An excercise for the Yield mentorship program
+/// @dev For use with AMMRouter
+contract AMMCore is ERC20("TooliganLP", "TLP", 18) {
+    // TODO:
+    // Add natspec
+    // Add tests for Burn and Swap and more tests for negative assertions
+    // refactor with math library
+    // unchecked ?
+
+    address public owner;
+    IERC20 public tokenX;
+    IERC20 public tokenY;
+    uint256 public reserveX;
+    uint256 public reserveY;
+    uint256 public k; // reserveX * reserveY == k
+
+    event Initialized(uint256 k);
+    event Minted(address guy, uint256 k);
+    event Burned(address guy, uint256 wad, uint256 xTokensToSend, uint256 yTokensToSend);
+    event Swapped(address guy, address tokenIn, uint256 amountX, uint256 amountY);
+
+    modifier isInitialized() {
+        require(k > 0, "Not initialized");
+        _;
+    }
+
+    modifier isOwner() {
+        require(msg.sender == owner, "Unauthorized");
+        _;
+    }
+
+    constructor(IERC20 _tokenX, IERC20 _tokenY) {
+        owner = msg.sender;
+        tokenX = _tokenX;
+        tokenY = _tokenY;
+    }
+
+    function setOwner(address _owner) public isOwner {
+        owner = _owner;
+    }
+
+    function _init(address admin) external isOwner {
+        require(k == 0, "Previously initialized");
+        reserveX = tokenX.balanceOf(address(this));
+        reserveY = tokenY.balanceOf(address(this));
+        k = reserveX * reserveY / 1e18;
+
+        _mint(admin, k);
+        emit Initialized(k);
+    }
+
+    function _mintLP(address guy) external isInitialized isOwner {
+        uint256 newReserveX = tokenX.balanceOf(address(this));
+        uint256 newReserveY = tokenY.balanceOf(address(this));
+        uint256 added0 = newReserveX - reserveX;
+        uint256 mintAmount = (((added0 * 1e18) / reserveX) * k) / 1e18;
+
+        reserveX = newReserveX;
+        reserveY = newReserveY;
+        k = reserveX * reserveY / 1e18;
+
+        _mint(guy, mintAmount);
+        emit Minted(guy, mintAmount);
+    }
+
+    function _burnLP(address guy, uint256 wad) external isInitialized isOwner {
+        uint256 burnRatio = (wad * 1e18 ) / _totalSupply;
+        uint256 xTokensToSend = burnRatio * reserveX;
+        uint256 yTokensToSend = burnRatio * reserveY;
+
+        reserveX -= xTokensToSend;
+        reserveY -= yTokensToSend;
+        k = reserveX * reserveY;
+        _burn(guy, wad);
+        tokenX.transfer(guy, xTokensToSend);
+        tokenY.transfer(guy, yTokensToSend);
+
+        emit Burned(guy, wad, xTokensToSend, yTokensToSend);
+    }
+
+    function _swapX(address guy) external isInitialized isOwner {
+        uint256 amountXIn = tokenX.balanceOf(address(this)) - reserveX;
+        console.log('amountXIn', amountXIn);
+        uint256 newReserveX = reserveX + amountXIn;
+        uint256 newReserveY = (k * 1e18) / newReserveX;
+        uint256 amountYOut = reserveY - newReserveY;
+        // console.log('reserveX', reserveX);
+        // console.log('reserveY', reserveY);
+        reserveX = newReserveX;
+        reserveY = newReserveY;
+        // console.log('reserveX', reserveX);
+        // console.log('reserveY', reserveY);
+        // console.log('amountYOut', amountYOut);
+        tokenY.transfer(guy, amountYOut);
+
+        emit Swapped(guy, address(tokenX), amountXIn, amountYOut);
+    }
+
+    function _swapY(address guy) external isInitialized isOwner {
+        uint256 amountYIn = tokenY.balanceOf(address(this)) - reserveY;
+        uint256 newReserveY = reserveY + amountYIn;
+        uint256 newReserveX = (k * 1e18) / newReserveY;
+        uint256 amountXOut = reserveX - newReserveX;
+
+        reserveX = newReserveX;
+        reserveY = newReserveY;
+        tokenX.transfer(guy, amountXOut);
+
+        emit Swapped(guy, address(tokenY), amountYIn, amountXOut);
+    }
+
+}

@@ -1,0 +1,162 @@
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.8.4;
+
+import "@yield-protocol/utils-v2/contracts/token/ERC20.sol";
+import "@yield-protocol/utils-v2/contracts/token/IERC20.sol";
+
+import "hardhat/console.sol";
+
+/// @title AMMRouter
+/// @author devtooligan.eth
+/// @notice Simple Automated Market Maker - Core logic contract. An excercise for the Yield mentorship program
+/// @dev For use with AMMRouter
+contract AMMCore is ERC20("TooliganLP", "TLP", 18) {
+    // TODO:
+    // Add natspec
+    // Add tests for Burn and Swap and more tests for negative assertions
+    // refactor with math library
+    // unchecked ?
+
+    address public owner;
+
+    // nested structs --- read directly
+    struct TokenData {
+        IERC20 token;
+        uint256 reserve;
+    }
+
+    struct Tokens {
+        TokenData x;
+        TokenData y;
+    }
+
+    Tokens public tokens;
+
+    uint256 public k; // x.reserve * y.reserve == k
+
+    event Initialized(uint256 k);
+    event Minted(address guy, uint256 k);
+    event Burned(address guy, uint256 wad, uint256 xTokensToSend, uint256 yTokensToSend);
+    event Swapped(address guy, address tokenIn, uint256 amountX, uint256 amountY);
+
+    modifier isInitialized() {
+        require(k > 0, "Not initialized");
+        _;
+    }
+
+    modifier isOwner() {
+        require(msg.sender == owner, "Unauthorized");
+        _;
+    }
+
+    constructor(IERC20 _xToken, IERC20 _yToken) {
+        owner = msg.sender;
+        tokens = Tokens({
+            x: TokenData(_xToken, 0),
+            y: TokenData(_yToken, 0)
+        });
+    }
+
+    function setOwner(address _owner) public isOwner {
+        owner = _owner;
+    }
+
+    function getData() internal view returns (
+        uint256,
+        uint256,
+        IERC20,
+        IERC20
+    )  {
+        Tokens memory t = tokens;
+        return (t.x.reserve, t.y.reserve, t.x.token, t.y.token);
+    }
+
+    function _init(address admin) external isOwner {
+        require(k == 0, "Previously initialized");
+        tokens.x.reserve = tokens.x.token.balanceOf(address(this));
+        tokens.y.reserve = tokens.y.token.balanceOf(address(this));
+        k = tokens.x.reserve * tokens.y.reserve / 1e18;
+
+        _mint(admin, k);
+        emit Initialized(k);
+    }
+
+    function _mintLP(address guy) external isInitialized isOwner {
+        (
+            uint256 xReserve,
+            ,
+            IERC20 xToken,
+            IERC20 yToken
+        ) = getData();
+        uint256 newXreserve = xToken.balanceOf(address(this));
+        uint256 newYreserve = yToken.balanceOf(address(this));
+        uint256 added0 = newXreserve - xReserve;
+        uint256 mintAmount = (((added0 * 1e18) / xReserve) * k) / 1e18;
+
+        tokens.x.reserve = newXreserve;
+        tokens.y.reserve = newYreserve;
+        k = tokens.x.reserve * tokens.y.reserve / 1e18;
+
+        _mint(guy, mintAmount);
+        emit Minted(guy, mintAmount);
+    }
+
+    function _burnLP(address guy, uint256 wad) external isInitialized isOwner {
+        (
+            uint256 xReserve,
+            uint256 yReserve,
+            IERC20 xToken,
+            IERC20 yToken
+        ) = getData();
+        uint256 burnRatio = (wad * 1e18 ) / _totalSupply;
+        uint256 xTokensToSend = burnRatio * xReserve;
+        uint256 yTokensToSend = burnRatio * yReserve;
+
+        tokens.x.reserve -= xTokensToSend;
+        tokens.y.reserve -= yTokensToSend;
+        k = tokens.x.reserve * tokens.y.reserve;
+        _burn(guy, wad);
+        xToken.transfer(guy, xTokensToSend);
+        yToken.transfer(guy, yTokensToSend);
+
+        emit Burned(guy, wad, xTokensToSend, yTokensToSend);
+    }
+
+    function _swapX(address guy) external isInitialized isOwner {
+        (
+            uint256 xReserve,
+            uint256 yReserve,
+            IERC20 xToken,
+            IERC20 yToken
+        ) = getData();
+        uint256 amountXIn = xToken.balanceOf(address(this)) - xReserve;
+        uint256 newXreserve = xReserve + amountXIn;
+        uint256 newYreserve = (k * 1e18) / newXreserve;
+        uint256 amountYOut = yReserve - newYreserve;
+        tokens.x.reserve = newXreserve;
+        tokens.y.reserve = newYreserve;
+        yToken.transfer(guy, amountYOut);
+
+        emit Swapped(guy, address(xToken), amountXIn, amountYOut);
+    }
+
+    function _swapY(address guy) external isInitialized isOwner {
+        (
+            uint256 xReserve,
+            uint256 yReserve,
+            IERC20 xToken,
+            IERC20 yToken
+        ) = getData();
+        uint256 amountYIn = yToken.balanceOf(address(this)) - yReserve;
+        uint256 newYreserve = yReserve + amountYIn;
+        uint256 newXreserve = (k * 1e18) / newYreserve;
+        uint256 amountXOut = xReserve - newXreserve;
+
+        tokens.x.reserve = newXreserve;
+        tokens.y.reserve = newYreserve;
+        xToken.transfer(guy, amountXOut);
+
+        emit Swapped(guy, address(yToken), amountYIn, amountXOut);
+    }
+
+}
