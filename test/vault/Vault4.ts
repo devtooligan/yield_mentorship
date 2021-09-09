@@ -8,14 +8,22 @@ import { Dai, Vault4, MockPriceFeedAggregator } from "../../typechain";
 
 const { deployContract } = hre.waffle;
 const { parseEther } = hre.ethers.utils;
+
+const WAD = BigNumber.from("1" + "0".repeat(18));
+
+const rateInvertWad = (ethRate: number) => {
+  const daiEthRate: number = Math.round(1e18 / ethRate);
+  return BigNumber.from(daiEthRate);
+};
+
 describe("Vault4 Unit tests", function () {
   this.timeout(0);
 
   let user1: SignerWithAddress; // assigned to this.signers[1]
   let user2: SignerWithAddress; // assigned to this.signers[2]
 
-  const WAD = BigNumber.from("1" + "0".repeat(18));
-  const initialExchangeRate = 3955;
+  const initialEthDaiExchangeRate = 3955.0;
+  const initialDaiEthExchangeRateWad = rateInvertWad(initialEthDaiExchangeRate);
 
   const vaultStartingDai = WAD.mul(200000);
   const user1StartingEth = parseEther("10");
@@ -23,8 +31,8 @@ describe("Vault4 Unit tests", function () {
 
   const depositEth1 = parseEther("1.5");
   const depositEth2 = parseEther("3");
-  const borrowDai1 = depositEth1.mul(initialExchangeRate);
-  const borrowDai2 = depositEth2.mul(initialExchangeRate).div(2);
+  const borrowDai1 = depositEth1.div(initialDaiEthExchangeRateWad).mul(WAD);
+  const borrowDai2 = depositEth2.div(initialDaiEthExchangeRateWad).div(2).mul(WAD);
 
   before(async function () {
     const signers: SignerWithAddress[] = await hre.ethers.getSigners();
@@ -41,7 +49,7 @@ describe("Vault4 Unit tests", function () {
     this.dai = <Dai>await deployContract(this.signers.admin, await hre.artifacts.readArtifact("Dai"), [1]);
     this.mockPriceFeedAggregator = <MockPriceFeedAggregator>(
       await deployContract(this.signers.admin, await hre.artifacts.readArtifact("MockPriceFeedAggregator"), [
-        initialExchangeRate,
+        initialDaiEthExchangeRateWad,
       ])
     );
     this.vault = <Vault4>(
@@ -59,15 +67,11 @@ describe("Vault4 Unit tests", function () {
   });
   describe("without deposits or loans", function () {
     it("#withdraw() should not be able to withdraw without a deposit", async function () {
-      await expect(this.vault.connect(user1).withdraw(1)).to.be.revertedWith("Insufficient balance");
+      await expect(this.vault.connect(user1).withdraw(parseEther("1"))).to.be.revertedWith("Insufficient balance");
     });
 
     it("#borrow() should not be able to borrow without a deposit", async function () {
-      await expect(this.vault.connect(user1).borrow(1000)).to.be.revertedWith("Insufficient collateral");
-    });
-
-    it("#liquidate() should not be able to liquidate without a deposit", async function () {
-      await expect(this.vault.connect(this.signers.admin).liquidate(user1.address)).to.be.revertedWith("No deposit");
+      await expect(this.vault.connect(user1).borrow(WAD.mul(1000))).to.be.revertedWith("Insufficient collateral");
     });
 
     it("#deposit() should allow deposits from one or more users", async function () {
@@ -93,7 +97,7 @@ describe("Vault4 Unit tests", function () {
     });
 
     it("#borrow() should not be able to borrow more than the deposit", async function () {
-      const borrow = depositEth1.add(parseEther("0.5")).mul(initialExchangeRate);
+      const borrow = depositEth1.add(parseEther("0.5")).mul(initialEthDaiExchangeRate).mul(WAD);
       await expect(this.vault.connect(user1).borrow(borrow)).to.be.revertedWith("Insufficient collateral");
     });
 
@@ -140,9 +144,11 @@ describe("Vault4 Unit tests", function () {
       });
 
       it("#borrow() should not be able to borrow beyond available collateral", async function () {
-        await expect(this.vault.connect(user1).borrow(1000)).to.be.revertedWith("Insufficient collateral");
+        await expect(this.vault.connect(user1).borrow(WAD.mul(1000))).to.be.revertedWith("Insufficient collateral");
         await expect(this.vault.connect(user2).borrow(borrowDai2)).to.not.be.reverted;
-        await expect(this.vault.connect(user2).borrow(1000)).to.be.revertedWith("Insufficient collateral");
+        await expect(this.vault.connect(user1).borrow(WAD.mul(1000))).to.be.revertedWith("Insufficient collateral");
+        await this.vault.connect(user1).deposit({ value: parseEther("1") });
+        await expect(this.vault.connect(user2).borrow(WAD.mul(1000))).to.be.revertedWith("Insufficient collateral");
       });
 
       it("#liquidate() should not be able to liquidate safe loans", async function () {
@@ -152,7 +158,7 @@ describe("Vault4 Unit tests", function () {
 
       it("#repay() should not be able to repay more than the borrowed amount", async function () {
         await this.dai.connect(this.signers.user1).approve(this.vault.address, borrowDai1.mul(2));
-        await expect(this.vault.connect(user1).repay(borrowDai1.mul(2))).to.be.revertedWith("Amount > loaned");
+        await expect(this.vault.connect(user1).repay(borrowDai1.mul(2))).to.be.revertedWith("Invalid amount");
       });
 
       it("#repay() should be able to repay up to the borrowed amount", async function () {
@@ -169,7 +175,7 @@ describe("Vault4 Unit tests", function () {
       });
 
       it("#liquidate() should be able to liquidate underwater loans", async function () {
-        await this.mockPriceFeedAggregator.setRate(50); // Setting eth/dai rate to $50
+        await this.mockPriceFeedAggregator.setRate(rateInvertWad(500));
         await expect(this.vault.connect(this.signers.admin).liquidate(user1.address))
           .to.emit(this.vault, "Liquidate")
           .withArgs(user1.address, borrowDai1, depositEth1);
@@ -185,13 +191,13 @@ describe("Vault4 Unit tests", function () {
 
       it("#withdraw() should be able to withdraw additional eth if ltv drops", async function () {
         await expect(this.vault.connect(user1).withdraw(parseEther("1"))).to.be.revertedWith("Insufficient balance");
-        await this.mockPriceFeedAggregator.setRate(20000); // Setting eth/dai rate to $20,000
+        await this.mockPriceFeedAggregator.setRate(rateInvertWad(20000)); // Setting eth/dai rate to $20,000
         await expect(this.vault.connect(user1).withdraw(parseEther("1"))).to.be.not.be.reverted;
       });
 
       it("#borrow() should be able to borrow additional eth if ltv drops", async function () {
         await expect(this.vault.connect(user1).borrow(1000)).to.be.revertedWith("Insufficient collateral");
-        await this.mockPriceFeedAggregator.setRate(20000); // Setting eth/dai rate to $20,000
+        await this.mockPriceFeedAggregator.setRate(rateInvertWad(20000)); // Setting eth/dai rate to $20,000
         await expect(this.vault.connect(user1).borrow(1000)).to.be.not.be.reverted;
       });
     });

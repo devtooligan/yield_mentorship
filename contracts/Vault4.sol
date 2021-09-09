@@ -33,13 +33,12 @@ contract Vault4 {
 
     //@notice Function used to get latest dai/eth exchange from price feed and convert eth to dai
     //@param _ethValue amount to apply exchange rate to
-    function applyExchangeRate(uint256 _ethValue) internal view returns (uint256 _resultDai) {
+    function applyExchangeRate(uint256 _ethWad) internal view returns (uint256 _resultDaiWad) {
         (, int256 answer, , , ) = priceFeed.latestRoundData();
         require(answer > 0, "Amount > 0 required");
-        uint256 _currentRate = uint256(answer);
-        _resultDai = _ethValue * _currentRate;
-        require(_resultDai / _currentRate == _ethValue, "Overflow");
-        return _resultDai;
+        uint256 _currentRateWad = uint256(answer);
+        _resultDaiWad = (_ethWad / _currentRateWad) * 1e18;
+        return _resultDaiWad;
     }
 
     //@notice Function used to deposit eth
@@ -53,11 +52,10 @@ contract Vault4 {
     function withdraw(uint256 _ethWad) external {
         require(_ethWad > 0, "Amount > 0 required");
         uint256 _deposit = deposits[msg.sender];
-        require(_deposit > 0, "Insufficient balance");
         uint256 _depositDaiValue = applyExchangeRate(_deposit);
         uint256 _withdrawDaiValue = applyExchangeRate(_ethWad);
         require((_depositDaiValue - loans[msg.sender]) >= _withdrawDaiValue, "Insufficient balance");
-        deposits[msg.sender] -= _ethWad;
+        deposits[msg.sender] = _deposit - _ethWad;
         payable(msg.sender).transfer(_ethWad);
         emit Withdraw(_ethWad);
     }
@@ -66,30 +64,27 @@ contract Vault4 {
     function borrow(uint256 _daiWad) external {
         require(_daiWad > 0, "Amount > 0 required");
         uint256 _depositEthValue = deposits[msg.sender];
-        require(_depositEthValue > 0, "Insufficient collateral1");
         uint256 _depositDaiValue = applyExchangeRate(_depositEthValue);
-
-        require((loans[msg.sender] + _daiWad) <= _depositDaiValue, "Insufficient collateral2");
+        require((loans[msg.sender] + _daiWad) <= _depositDaiValue, "Insufficient collateral");
         loans[msg.sender] += _daiWad;
-        token.push(msg.sender, _daiWad);
+        token.transfer(msg.sender, _daiWad);
         emit Borrow(_daiWad);
     }
 
     //@notice Function used to pay down dai loans
     function repay(uint256 _daiWad) external {
-        require(_daiWad > 0, "Amount > 0 required");
-        require(_daiWad <= loans[msg.sender], "Amount > loaned");
-        loans[msg.sender] -= _daiWad;
-        token.pull(msg.sender, _daiWad);
+        require(_daiWad > 0 && (_daiWad <= loans[msg.sender]), "Invalid amount");
+        unchecked {
+            loans[msg.sender] -= _daiWad;
+        }
+        token.transferFrom(msg.sender, address(this), _daiWad);
         emit Repay(_daiWad);
     }
 
     //@notice Function used to liquidate
     function liquidate(address guy) external {
         uint256 _depositEth = deposits[guy];
-        require(_depositEth > 0, "No deposit");
         uint256 _loanDai = loans[guy];
-        require(_loanDai > 0, "No loan");
         uint256 _depositDaiValue = applyExchangeRate(_depositEth);
         require(_loanDai > _depositDaiValue, "Loan safe");
         delete loans[guy];
