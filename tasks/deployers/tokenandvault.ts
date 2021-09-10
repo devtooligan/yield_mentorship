@@ -1,15 +1,32 @@
 import { task } from "hardhat/config";
 import { TaskArguments } from "hardhat/types";
 
-import { TooliganToken, TooliganToken__factory, Vault3, Vault3__factory } from "../../typechain";
+import {
+  Dai,
+  Dai__factory,
+  Vault4,
+  Vault4__factory,
+  MockPriceFeedAggregator,
+  MockPriceFeedAggregator__factory,
+} from "../../typechain";
 
-task("deploy:TokenAndVault3").setAction(async function (taskArguments: TaskArguments, { ethers }) {
-  const tooliganTokenFactory: TooliganToken__factory = await ethers.getContractFactory("TooliganToken");
-  const tooliganToken: TooliganToken = <TooliganToken>await tooliganTokenFactory.deploy();
-  await tooliganToken.deployed();
-  console.log("TooliganToken deployed to: ", tooliganToken.address);
-  const vault3Factory: Vault3__factory = await ethers.getContractFactory("Vault3");
-  const vault: Vault3 = <Vault3>await vault3Factory.deploy(tooliganToken.address, 1);
+task("deploy:TokenAndVault4WithOracle").setAction(async function (taskArguments: TaskArguments, { ethers }) {
+  const mockPriceFeedAggregatorFactory: MockPriceFeedAggregator__factory = await ethers.getContractFactory(
+    "MockPriceFeedAggregator",
+  );
+  const mockPriceFeedAggregator: MockPriceFeedAggregator = <MockPriceFeedAggregator>(
+    await mockPriceFeedAggregatorFactory.deploy(1)
+  );
+  await mockPriceFeedAggregator.deployed();
+  console.log("MockPriceFeedAggregator deployed to: ", mockPriceFeedAggregator.address);
+
+  const daiFactory: Dai__factory = await ethers.getContractFactory("Dai");
+  const { chainId } = await ethers.provider.getNetwork();
+  const dai: Dai = <Dai>await daiFactory.deploy(chainId);
+  await dai.deployed();
+  console.log("Dai deployed to: ", dai.address);
+  const vault4Factory: Vault4__factory = await ethers.getContractFactory("Vault4");
+  const vault: Vault4 = <Vault4>await vault4Factory.deploy(dai.address, mockPriceFeedAggregator.address);
   await vault.deployed();
   console.log("Vault deployed to: ", vault.address);
 });

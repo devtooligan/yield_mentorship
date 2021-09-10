@@ -41,6 +41,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@chainlink/contracts@npm:^0.2.1":
+  version: 0.2.1
+  resolution: "@chainlink/contracts@npm:0.2.1"
+  checksum: fdc5e4354f736f4743f229f979a0c4cc546bba00e71dc00c5e2c928f0c3ec5a03d27e104bc604189aa15d4ff55bfec63e97ce38cf6ab35c51499d75c6843d2ea
+  languageName: node
+  linkType: hard
+
 "@codechecks/client@npm:^0.1.11":
   version: 0.1.11
   resolution: "@codechecks/client@npm:0.1.11"
@@ -1194,6 +1201,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@paulrberg/solidity-template@workspace:."
   dependencies:
+    "@chainlink/contracts": ^0.2.1
     "@codechecks/client": ^0.1.11
     "@commitlint/cli": ^13.1.0
     "@commitlint/config-conventional": ^13.1.0

@@ -16,7 +16,7 @@ import { NetworkUserConfig } from "hardhat/types";
 
 dotenvConfig({ path: resolve(__dirname, "./.env") });
 
-const chainIds = {
+export const chainIds = {
   ganache: 1337,
   goerli: 5,
   hardhat: 31337,
