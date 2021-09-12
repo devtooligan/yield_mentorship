@@ -25,6 +25,7 @@ contract AMMRouter {
         require(wadX > 0 && wadY > 0, "Invalid amounts");
         TokenData memory x = core.getX();
         TokenData memory y = core.getY();
+        require(x.reserve > 0 && y.reserve > 0, "Not initialized");
         require((x.reserve / y.reserve) * 1e18 == (wadX / wadY) * 1e18, "Invalid amounts");
 
         x.token.transferFrom(msg.sender, address(core), wadX);

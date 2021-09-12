@@ -45,8 +45,8 @@ contract AMMCore is ERC20("TooliganLP", "TLP", 18), IAMMCore {
 
         IERC20 xToken = x.token;
         IERC20 yToken = y.token;
-        TransferHelper.safeTransferFrom(xToken, address(this), owner, wadX);
-        TransferHelper.safeTransferFrom(yToken, address(this), owner, wadY);
+        TransferHelper.safeTransferFrom(xToken, owner, address(this), wadX);
+        TransferHelper.safeTransferFrom(yToken, owner, address(this), wadY);
         uint256 xBalance = xToken.balanceOf(address(this));
         uint256 yBalance = yToken.balanceOf(address(this));
 
@@ -129,7 +129,7 @@ contract AMMCore is ERC20("TooliganLP", "TLP", 18), IAMMCore {
     //@dev This should be called by the router contract
     function swapY(address guy) external override {
         uint256 kValue = k;
-        require(kValue > 0, "Not intitialized");
+        require(kValue > 0, "Not initialized");
         TokenData memory xData = x;
         TokenData memory yData = y;
         uint256 amountYIn = yData.token.balanceOf(address(this)) - yData.reserve;

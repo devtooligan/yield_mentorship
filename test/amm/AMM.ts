@@ -50,7 +50,6 @@ describe("AMM Unit tests", function () {
     this.amm = <AMMRouter>(
       await deployContract(this.signers.admin, await hre.artifacts.readArtifact("AMMRouter"), [this.core.address])
     );
-    this.core.connect(admin).setOwner(this.amm.address);
 
     // Fund wallets with Toolies
     await this.tokenX.mint(admin.address, adminStartingTooliesWad);
@@ -82,24 +81,24 @@ describe("AMM Unit tests", function () {
     });
 
     it("#init() should not allow initialization by non-owner", async function () {
-      await this.tokenX.connect(user1).approve(this.amm.address, user1StartingTooliesWad);
-      await this.tokenY.connect(user1).approve(this.amm.address, user1StartingDaiWad);
-      await expect(this.amm.connect(user1).init(user1StartingTooliesWad, user1StartingDaiWad)).to.be.revertedWith(
+      await this.tokenX.connect(user1).approve(this.core.address, user1StartingTooliesWad);
+      await this.tokenY.connect(user1).approve(this.core.address, user1StartingDaiWad);
+      await expect(this.core.connect(user1).init(user1StartingTooliesWad, user1StartingDaiWad)).to.be.revertedWith(
         "Unauthorized",
       );
     });
 
     it("#init() should initialize", async function () {
-      await this.tokenX.connect(admin).approve(this.amm.address, adminStartingTooliesWad);
-      await this.tokenY.connect(admin).approve(this.amm.address, adminStartingDaiWad);
+      await this.tokenX.connect(admin).approve(this.core.address, adminStartingTooliesWad);
+      await this.tokenY.connect(admin).approve(this.core.address, adminStartingDaiWad);
       const newK = adminStartingDaiWad.mul(adminStartingTooliesWad).div(WAD);
-      await expect(this.amm.connect(admin).init(adminStartingTooliesWad, adminStartingDaiWad))
+      await expect(this.core.connect(admin).init(adminStartingTooliesWad, adminStartingDaiWad))
         .to.emit(this.core, "Initialized")
         .withArgs(newK);
       expect(await this.core.balanceOf(admin.address)).to.equal(newK);
       expect(await this.core.k()).to.equal(newK);
-      const x = await this.core.x();
-      const y = await this.core.y();
+      const x = await this.core.getX();
+      const y = await this.core.getY();
       expect(x.reserve).to.equal(adminStartingTooliesWad);
       expect(y.reserve).to.equal(adminStartingDaiWad);
     });
@@ -107,17 +106,17 @@ describe("AMM Unit tests", function () {
 
   describe("initialized", async function () {
     beforeEach(async function () {
-      await this.tokenX.connect(admin).approve(this.amm.address, adminStartingTooliesWad);
-      await this.tokenY.connect(admin).approve(this.amm.address, adminStartingDaiWad);
+      await this.tokenX.connect(admin).approve(this.core.address, adminStartingTooliesWad);
+      await this.tokenY.connect(admin).approve(this.core.address, adminStartingDaiWad);
       // 10 : 20   k=200
-      await this.amm.connect(admin).init(adminStartingTooliesWad, adminStartingDaiWad);
+      await this.core.connect(admin).init(adminStartingTooliesWad, adminStartingDaiWad);
     });
 
     it("#init() should not allow initialization more than once", async function () {
-      await this.tokenX.connect(admin).approve(this.amm.address, adminStartingTooliesWad);
-      await this.tokenY.connect(admin).approve(this.amm.address, adminStartingDaiWad);
-      await expect(this.amm.connect(admin).init(adminStartingTooliesWad, adminStartingDaiWad)).to.be.revertedWith(
-        "Already initialized",
+      await this.tokenX.connect(admin).approve(this.core.address, adminStartingTooliesWad);
+      await this.tokenY.connect(admin).approve(this.core.address, adminStartingDaiWad);
+      await expect(this.core.connect(admin).init(adminStartingTooliesWad, adminStartingDaiWad)).to.be.revertedWith(
+        "Previously initialized",
       );
     });
 
@@ -136,8 +135,8 @@ describe("AMM Unit tests", function () {
       await expect(this.amm.connect(user1).sellX(xAmount))
         .to.emit(this.core, "Swapped")
         .withArgs(user1.address, this.tokenX.address, xAmount, expectedYAmount);
-      const x = await this.core.x();
-      const y = await this.core.y();
+      const x = await this.core.getX();
+      const y = await this.core.getY();
       expect(x.reserve).to.equal(xAmount.add(adminStartingTooliesWad));
       expect(y.reserve).to.equal(adminStartingDaiWad.sub(expectedYAmount));
     });
@@ -149,8 +148,8 @@ describe("AMM Unit tests", function () {
       await expect(this.amm.connect(user1).sellY(yAmount))
         .to.emit(this.core, "Swapped")
         .withArgs(user1.address, this.tokenY.address, yAmount, expectedXAmount);
-      const x = await this.core.x();
-      const y = await this.core.y();
+      const x = await this.core.getX();
+      const y = await this.core.getY();
       expect(x.reserve).to.equal(adminStartingTooliesWad.sub(expectedXAmount));
       expect(y.reserve).to.equal(adminStartingDaiWad.add(yAmount));
     });
@@ -167,8 +166,8 @@ describe("AMM Unit tests", function () {
       const newK = WAD.mul(15 * 30);
       expect(await this.core.balanceOf(user1.address)).to.equal(minted);
       expect(await this.core.k()).to.equal(newK);
-      const x = await this.core.x();
-      const y = await this.core.y();
+      const x = await this.core.getX();
+      const y = await this.core.getY();
       expect(x.reserve).to.equal(xAmount.add(adminStartingTooliesWad));
       expect(y.reserve).to.equal(yAmount.add(adminStartingDaiWad));
     });
