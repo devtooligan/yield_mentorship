@@ -8,9 +8,9 @@ import "../types/TokenData.sol";
  * @dev Interface for AMMCore
  */
 interface IAMMCore is IERC20 {
-    function x() external view returns (TokenData calldata);
+    function getX() external view returns (TokenData memory);
 
-    function y() external view returns (TokenData calldata);
+    function getY() external view returns (TokenData memory);
 
     event Initialized(uint256 k);
     event Minted(address indexed guy, uint256 k);

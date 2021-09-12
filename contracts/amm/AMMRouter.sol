@@ -23,8 +23,8 @@ contract AMMRouter {
     // @param wadY The amount of tokenY to add
     function mint(uint256 wadX, uint256 wadY) external {
         require(wadX > 0 && wadY > 0, "Invalid amounts");
-        TokenData memory x = core.x();
-        TokenData memory y = core.y();
+        TokenData memory x = core.getX();
+        TokenData memory y = core.getY();
         require((x.reserve / y.reserve) * 1e18 == (wadX / wadY) * 1e18, "Invalid amounts");
 
         x.token.transferFrom(msg.sender, address(core), wadX);
@@ -44,7 +44,7 @@ contract AMMRouter {
     // @param wad The amount of tokenX to sell
     function sellX(uint256 wad) external {
         require(wad > 0, "Invalid amount");
-        TokenData memory x = core.x();
+        TokenData memory x = core.getX();
         x.token.transferFrom(msg.sender, address(core), wad);
         core.swapX(msg.sender);
     }
@@ -53,7 +53,7 @@ contract AMMRouter {
     // @param wad The amount of tokenY to sell
     function sellY(uint256 wad) external {
         require(wad > 0, "Invalid amount");
-        TokenData memory y = core.y();
+        TokenData memory y = core.getY();
         y.token.transferFrom(msg.sender, address(core), wad);
         core.swapY(msg.sender);
     }

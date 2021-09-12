@@ -14,8 +14,8 @@ import "../types/TokenData.sol";
 /// @dev For use with AMMRouter
 contract AMMCore is ERC20("TooliganLP", "TLP", 18), IAMMCore {
     address public owner;
-    TokenData public override x;
-    TokenData public override y;
+    TokenData internal x;
+    TokenData internal y;
     uint256 public k; // x.reserve * y.reserve == k
 
     //@notice Initialized with contracts of two tokens in pair
@@ -23,6 +23,14 @@ contract AMMCore is ERC20("TooliganLP", "TLP", 18), IAMMCore {
         x = TokenData(_xToken, 0);
         y = TokenData(_yToken, 0);
         owner = msg.sender;
+    }
+
+    function getX() external view override returns (TokenData memory) {
+        return x;
+    }
+
+    function getY() external view override returns (TokenData memory) {
+        return y;
     }
 
     //@notice Initializes liquidity pools and k
