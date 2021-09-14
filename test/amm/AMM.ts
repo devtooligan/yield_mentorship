@@ -48,7 +48,11 @@ describe("AMM Unit tests", function () {
       ])
     );
     this.amm = <AMMRouter>(
-      await deployContract(this.signers.admin, await hre.artifacts.readArtifact("AMMRouter"), [this.core.address])
+      await deployContract(this.signers.admin, await hre.artifacts.readArtifact("AMMRouter"), [
+        this.core.address,
+        this.tokenX.address,
+        this.tokenY.address,
+      ])
     );
 
     // Fund wallets with Toolies
@@ -96,11 +100,10 @@ describe("AMM Unit tests", function () {
         .to.emit(this.core, "Initialized")
         .withArgs(newK);
       expect(await this.core.balanceOf(admin.address)).to.equal(newK);
-      expect(await this.core.k()).to.equal(newK);
-      const x = await this.core.getX();
-      const y = await this.core.getY();
-      expect(x.reserve).to.equal(adminStartingTooliesWad);
-      expect(y.reserve).to.equal(adminStartingDaiWad);
+      const xReserve = await this.core.reserveX();
+      const yReserve = await this.core.reserveY();
+      expect(xReserve).to.equal(adminStartingTooliesWad);
+      expect(yReserve).to.equal(adminStartingDaiWad);
     });
   });
 
@@ -121,8 +124,8 @@ describe("AMM Unit tests", function () {
     });
 
     it("#mint() should not allow unbalanced amounts for minting LP", async function () {
-      const xAmount = user1StartingTooliesWad; // 5
-      const yAmount = user1StartingTooliesWad; // 5
+      const xAmount = user1StartingDaiWad; // 10
+      const yAmount = user1StartingDaiWad; // 10
       await this.tokenY.connect(user1).approve(this.amm.address, yAmount);
       await this.tokenX.connect(user1).approve(this.amm.address, xAmount);
       await expect(this.amm.connect(user1).mint(xAmount, yAmount)).to.be.revertedWith("Invalid amounts");
@@ -135,10 +138,10 @@ describe("AMM Unit tests", function () {
       await expect(this.amm.connect(user1).sellX(xAmount))
         .to.emit(this.core, "Swapped")
         .withArgs(user1.address, this.tokenX.address, xAmount, expectedYAmount);
-      const x = await this.core.getX();
-      const y = await this.core.getY();
-      expect(x.reserve).to.equal(xAmount.add(adminStartingTooliesWad));
-      expect(y.reserve).to.equal(adminStartingDaiWad.sub(expectedYAmount));
+      const xReserve = await this.core.reserveX();
+      const yReserve = await this.core.reserveY();
+      expect(xReserve).to.equal(xAmount.add(adminStartingTooliesWad));
+      expect(yReserve).to.equal(adminStartingDaiWad.sub(expectedYAmount));
     });
 
     it("#sellY() should allow selling of tokenY ", async function () {
@@ -148,10 +151,10 @@ describe("AMM Unit tests", function () {
       await expect(this.amm.connect(user1).sellY(yAmount))
         .to.emit(this.core, "Swapped")
         .withArgs(user1.address, this.tokenY.address, yAmount, expectedXAmount);
-      const x = await this.core.getX();
-      const y = await this.core.getY();
-      expect(x.reserve).to.equal(adminStartingTooliesWad.sub(expectedXAmount));
-      expect(y.reserve).to.equal(adminStartingDaiWad.add(yAmount));
+      const xReserve = await this.core.reserveX();
+      const yReserve = await this.core.reserveY();
+      expect(xReserve).to.equal(adminStartingTooliesWad.sub(expectedXAmount));
+      expect(yReserve).to.equal(adminStartingDaiWad.add(yAmount));
     });
 
     it("#mint() should mint", async function () {
@@ -163,14 +166,11 @@ describe("AMM Unit tests", function () {
       await expect(this.amm.connect(user1).mint(xAmount, yAmount))
         .to.emit(this.core, "Minted")
         .withArgs(user1.address, minted); // half the original 200
-      const newK = WAD.mul(15 * 30);
       expect(await this.core.balanceOf(user1.address)).to.equal(minted);
-      expect(await this.core.k()).to.equal(newK);
-      const x = await this.core.getX();
-      const y = await this.core.getY();
-      expect(x.reserve).to.equal(xAmount.add(adminStartingTooliesWad));
-      expect(y.reserve).to.equal(yAmount.add(adminStartingDaiWad));
+      const xReserve = await this.core.reserveX();
+      const yReserve = await this.core.reserveY();
+      expect(xReserve).to.equal(xAmount.add(adminStartingTooliesWad));
+      expect(yReserve).to.equal(yAmount.add(adminStartingDaiWad));
     });
-    await hre.storageLayout.export();
   });
 });

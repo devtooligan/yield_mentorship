@@ -2,16 +2,11 @@
 pragma solidity >=0.8.4;
 
 import "@yield-protocol/utils-v2/contracts/token/IERC20.sol";
-import "../types/TokenData.sol";
 
 /**
  * @dev Interface for AMMCore
  */
 interface IAMMCore is IERC20 {
-    function getX() external view returns (TokenData memory);
-
-    function getY() external view returns (TokenData memory);
-
     event Initialized(uint256 k);
     event Minted(address indexed guy, uint256 k);
     event Burned(address indexed guy, uint256 wad, uint256 xTokensToSend, uint256 yTokensToSend);

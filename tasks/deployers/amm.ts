@@ -30,7 +30,9 @@ task("deploy:TokenAndVault4WithOracle").setAction(async function (taskArguments:
   console.log("AMMCore deployed to: ", ammCore.address);
 
   const ammRouterFactory: AMMRouter__factory = await ethers.getContractFactory("AMMRouter");
-  const ammRouter: AMMRouter = <AMMRouter>await ammRouterFactory.deploy(ammCore.address);
+  const ammRouter: AMMRouter = <AMMRouter>(
+    await ammRouterFactory.deploy(ammCore.address, tooliganToken.address, dai.address)
+  );
   await ammRouter.deployed();
   console.log("AMMRouter deployed to: ", ammRouter.address);
 });

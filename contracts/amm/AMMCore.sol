@@ -6,7 +6,6 @@ import "@yield-protocol/utils-v2/contracts/token/IERC20.sol";
 import "@yield-protocol/utils-v2/contracts/token/TransferHelper.sol";
 
 import "../interfaces/IAMMCore.sol";
-import "../types/TokenData.sol";
 
 /// @title AMMRouter
 /// @author devtooligan.eth
@@ -14,23 +13,16 @@ import "../types/TokenData.sol";
 /// @dev For use with AMMRouter
 contract AMMCore is ERC20("TooliganLP", "TLP", 18), IAMMCore {
     address public owner;
-    TokenData internal x;
-    TokenData internal y;
-    uint256 public k; // x.reserve * y.reserve == k
+    uint256 public reserveX;
+    uint256 public reserveY;
+    IERC20 public tokenX;
+    IERC20 public tokenY;
 
     //@notice Initialized with contracts of two tokens in pair
-    constructor(IERC20 _xToken, IERC20 _yToken) {
-        x = TokenData(_xToken, 0);
-        y = TokenData(_yToken, 0);
+    constructor(IERC20 _tokenX, IERC20 _tokenY) {
+        tokenX = _tokenX;
+        tokenY = _tokenY;
         owner = msg.sender;
-    }
-
-    function getX() external view override returns (TokenData memory) {
-        return x;
-    }
-
-    function getY() external view override returns (TokenData memory) {
-        return y;
     }
 
     //@notice Initializes liquidity pools and k
@@ -39,42 +31,40 @@ contract AMMCore is ERC20("TooliganLP", "TLP", 18), IAMMCore {
     // @param wadX The amount of tokenX to add
     // @param wadY The amount of tokenY to add
     function init(uint256 wadX, uint256 wadY) external override {
-        require(msg.sender == owner, "Unauthorized");
-        require(k == 0, "Previously initialized");
         require(wadX > 0 && wadY > 0, "Invalid amounts");
+        require(msg.sender == owner, "Unauthorized");
+        require(reserveX == 0 && reserveY == 0, "Previously initialized");
 
-        IERC20 xToken = x.token;
-        IERC20 yToken = y.token;
-        TransferHelper.safeTransferFrom(xToken, owner, address(this), wadX);
-        TransferHelper.safeTransferFrom(yToken, owner, address(this), wadY);
-        uint256 xBalance = xToken.balanceOf(address(this));
-        uint256 yBalance = yToken.balanceOf(address(this));
+        IERC20 x = tokenX;
+        IERC20 y = tokenY;
+        TransferHelper.safeTransferFrom(x, owner, address(this), wadX);
+        TransferHelper.safeTransferFrom(y, owner, address(this), wadY);
+        reserveX = wadX;
+        reserveY = wadY;
+        uint256 newK = (wadX * wadY) / 1e18;
 
-        x.reserve = xBalance;
-        y.reserve = yBalance;
-        uint256 kValue = (xBalance * yBalance) / 1e18;
-        k = kValue;
+        _mint(owner, newK);
 
-        _mint(owner, kValue);
-
-        emit Initialized(kValue);
+        emit Initialized(newK);
     }
 
     //@notice Initializes liquidity pools / k ratio
     //@param admin - who will get the initial lp's
     //@dev This should be called by the router contract
     function mintLP(address guy) external override {
-        uint256 kValue = k;
-        require(kValue > 0, "Not initialized");
-        uint256 newXreserve = x.token.balanceOf(address(this));
-        uint256 newYreserve = y.token.balanceOf(address(this));
-        uint256 addedX = newXreserve - x.reserve;
-        uint256 mintAmount = (addedX * kValue) / x.reserve;
+        uint256 oldReserveX = reserveX;
+        uint256 oldReserveY = reserveY;
 
-        x.reserve = newXreserve;
-        y.reserve = newYreserve;
-        k = (x.reserve * y.reserve) / 1e18;
+        require(oldReserveX > 0 && oldReserveY > 0, "Not initialized");
+        uint256 newReserveX = tokenX.balanceOf(address(this));
+        uint256 newReserveY = tokenY.balanceOf(address(this));
+        uint256 addedX = newReserveX - oldReserveX;
+        uint256 addedY = newReserveY - oldReserveY;
+        require(((oldReserveX * 1e18) / oldReserveY) == ((addedX * 1e18) / addedY), "Invalid amounts");
+        uint256 mintAmount = (addedX * _totalSupply) / oldReserveX;
 
+        reserveX = newReserveX;
+        reserveY = newReserveY;
         _mint(guy, mintAmount);
 
         emit Minted(guy, mintAmount);
@@ -84,21 +74,23 @@ contract AMMCore is ERC20("TooliganLP", "TLP", 18), IAMMCore {
     //@param admin - who will get the initial lp's
     //@dev This should be called by the router contract
     function burnLP(address guy, uint256 wad) external override {
-        uint256 xReserve = x.reserve;
-        uint256 yReserve = y.reserve;
-        require(xReserve > 0 && yReserve > 0, "Not initialized");
+        uint256 oldReserveX = reserveX;
+        uint256 oldReserveY = reserveY;
+        require(oldReserveX > 0 && oldReserveY > 0, "Not initialized");
+
         uint256 burnRatio = (wad * 1e18) / _totalSupply;
-        uint256 xTokensToSend = burnRatio * xReserve;
-        uint256 yTokensToSend = burnRatio * yReserve;
+        uint256 tokenXToSend = burnRatio * oldReserveX;
+        uint256 tokenYToSend = burnRatio * oldReserveY;
+        uint256 newReserveX = oldReserveX - tokenXToSend;
+        uint256 newReserveY = oldReserveY - tokenYToSend;
 
-        x.reserve = xReserve - xTokensToSend;
-        y.reserve = yReserve - yTokensToSend;
-        k = (x.reserve * y.reserve) / 1e18;
+        reserveX = newReserveX;
+        reserveY = newReserveY;
         _burn(guy, wad);
-        TransferHelper.safeTransfer(x.token, guy, xTokensToSend);
-        TransferHelper.safeTransfer(y.token, guy, yTokensToSend);
+        TransferHelper.safeTransfer(tokenX, guy, tokenXToSend);
+        TransferHelper.safeTransfer(tokenY, guy, tokenYToSend);
 
-        emit Burned(guy, wad, xTokensToSend, yTokensToSend);
+        emit Burned(guy, wad, tokenXToSend, tokenYToSend);
     }
 
     //@notice Used to sell a fixed amount of tokenX for a computed amount of Y
@@ -106,21 +98,22 @@ contract AMMCore is ERC20("TooliganLP", "TLP", 18), IAMMCore {
     //@param address - The address of the seller / where to send the Y tokens
     //@dev This should be called by the router contract
     function swapX(address guy) external override {
-        uint256 kValue = k;
-        require(kValue > 0, "Not initialized");
-        TokenData memory xData = x;
-        TokenData memory yData = y;
+        uint256 oldReserveX = reserveX;
+        uint256 oldReserveY = reserveY;
+        uint256 oldK = (oldReserveX * oldReserveY) / 1e18;
+        require(oldK > 0, "Not initialized");
 
-        uint256 amountXIn = xData.token.balanceOf(address(this)) - xData.reserve;
-        uint256 newXreserve = xData.reserve + amountXIn;
-        uint256 newYreserve = (kValue * 1e18) / newXreserve;
-        uint256 amountYOut = yData.reserve - newYreserve;
+        IERC20 x = tokenX;
+        uint256 amountXIn = x.balanceOf(address(this)) - oldReserveX;
+        uint256 newReserveX = oldReserveX + amountXIn;
+        uint256 newReserveY = (oldK * 1e18) / newReserveX;
+        uint256 amountYOut = oldReserveY - newReserveY;
 
-        x.reserve = newXreserve;
-        y.reserve = newYreserve;
-        TransferHelper.safeTransfer(yData.token, guy, amountYOut);
+        reserveX = newReserveX;
+        reserveY = newReserveY;
+        TransferHelper.safeTransfer(tokenY, guy, amountYOut);
 
-        emit Swapped(guy, address(xData.token), amountXIn, amountYOut);
+        emit Swapped(guy, address(x), amountXIn, amountYOut);
     }
 
     //@notice Used to sell a fixed amount of tokenY for a computed amount of X
@@ -128,19 +121,21 @@ contract AMMCore is ERC20("TooliganLP", "TLP", 18), IAMMCore {
     //@param address - The address of the seller / where to send the X tokens
     //@dev This should be called by the router contract
     function swapY(address guy) external override {
-        uint256 kValue = k;
-        require(kValue > 0, "Not initialized");
-        TokenData memory xData = x;
-        TokenData memory yData = y;
-        uint256 amountYIn = yData.token.balanceOf(address(this)) - yData.reserve;
-        uint256 newYreserve = yData.reserve + amountYIn;
-        uint256 newXreserve = (kValue * 1e18) / newYreserve;
-        uint256 amountXOut = xData.reserve - newXreserve;
+        uint256 oldReserveX = reserveX;
+        uint256 oldReserveY = reserveY;
+        uint256 oldK = (oldReserveX * oldReserveY) / 1e18;
+        require(oldK > 0, "Not initialized");
 
-        x.reserve = newXreserve;
-        y.reserve = newYreserve;
-        TransferHelper.safeTransfer(xData.token, guy, amountXOut);
+        IERC20 y = tokenY;
+        uint256 amountYIn = y.balanceOf(address(this)) - oldReserveY;
+        uint256 newReserveY = oldReserveY + amountYIn;
+        uint256 newReserveX = (oldK * 1e18) / newReserveY;
+        uint256 amountXOut = reserveX - newReserveX;
 
-        emit Swapped(guy, address(yData.token), amountYIn, amountXOut);
+        reserveX = newReserveX;
+        reserveY = newReserveY;
+        TransferHelper.safeTransfer(tokenX, guy, amountXOut);
+
+        emit Swapped(guy, address(y), amountYIn, amountXOut);
     }
 }
