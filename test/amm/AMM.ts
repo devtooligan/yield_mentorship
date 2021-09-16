@@ -100,8 +100,9 @@ describe("AMM Unit tests", function () {
         .to.emit(this.core, "Initialized")
         .withArgs(newK);
       expect(await this.core.balanceOf(admin.address)).to.equal(newK);
-      const xReserve = await this.core.reserveX();
-      const yReserve = await this.core.reserveY();
+      const reserve = await this.core.reserve();
+      const xReserve = await reserve.x;
+      const yReserve = await reserve.y;
       expect(xReserve).to.equal(adminStartingTooliesWad);
       expect(yReserve).to.equal(adminStartingDaiWad);
     });
@@ -138,8 +139,9 @@ describe("AMM Unit tests", function () {
       await expect(this.amm.connect(user1).sellX(xAmount))
         .to.emit(this.core, "Swapped")
         .withArgs(user1.address, this.tokenX.address, xAmount, expectedYAmount);
-      const xReserve = await this.core.reserveX();
-      const yReserve = await this.core.reserveY();
+      const reserve = await this.core.reserve();
+      const xReserve = await reserve.x;
+      const yReserve = await reserve.y;
       expect(xReserve).to.equal(xAmount.add(adminStartingTooliesWad));
       expect(yReserve).to.equal(adminStartingDaiWad.sub(expectedYAmount));
     });
@@ -151,8 +153,9 @@ describe("AMM Unit tests", function () {
       await expect(this.amm.connect(user1).sellY(yAmount))
         .to.emit(this.core, "Swapped")
         .withArgs(user1.address, this.tokenY.address, yAmount, expectedXAmount);
-      const xReserve = await this.core.reserveX();
-      const yReserve = await this.core.reserveY();
+      const reserve = await this.core.reserve();
+      const xReserve = await reserve.x;
+      const yReserve = await reserve.y;
       expect(xReserve).to.equal(adminStartingTooliesWad.sub(expectedXAmount));
       expect(yReserve).to.equal(adminStartingDaiWad.add(yAmount));
     });
@@ -167,8 +170,9 @@ describe("AMM Unit tests", function () {
         .to.emit(this.core, "Minted")
         .withArgs(user1.address, minted); // half the original 200
       expect(await this.core.balanceOf(user1.address)).to.equal(minted);
-      const xReserve = await this.core.reserveX();
-      const yReserve = await this.core.reserveY();
+      const reserve = await this.core.reserve();
+      const xReserve = await reserve.x;
+      const yReserve = await reserve.y;
       expect(xReserve).to.equal(xAmount.add(adminStartingTooliesWad));
       expect(yReserve).to.equal(yAmount.add(adminStartingDaiWad));
     });
