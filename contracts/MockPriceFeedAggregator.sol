@@ -5,17 +5,15 @@ import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 contract MockPriceFeedAggregator is AggregatorV3Interface {
     int256 public rate; // settable rate that will be returned
+    uint8 public override decimals;
 
-    constructor(int256 _rate) {
+    constructor(int256 _rate, uint8 _decimals) {
         rate = _rate;
+        decimals = _decimals;
     }
 
     function setRate(int256 _rate) external {
         rate = _rate;
-    }
-
-    function decimals() external pure override returns (uint8) {
-        return 18;
     }
 
     function description() external pure override returns (string memory) {
