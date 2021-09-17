@@ -3,7 +3,6 @@ pragma solidity >=0.8.4;
 
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@yield-protocol/utils-v2/contracts/token/TransferHelper.sol";
-import "hardhat/console.sol";
 
 // @title  MultiCollateral Vault - An exercise for the Yield Mentorship program
 // @notice Deposit ERC20 Tokens - Borrow Dai
