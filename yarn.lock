@@ -1234,6 +1234,7 @@ __metadata:
     fs-extra: ^10.0.0
     hardhat: ^2.6.0
     hardhat-gas-reporter: ^1.0.4
+    hardhat-storage-layout: ^0.1.6
     husky: ^7.0.1
     lint-staged: ^11.1.2
     mocha: ^9.0.3
@@ -4240,6 +4241,15 @@ __metadata:
   version: 1.1.0
   resolution: "console-control-strings@npm:1.1.0"
   checksum: 8755d76787f94e6cf79ce4666f0c5519906d7f5b02d4b884cf41e11dcd759ed69c57da0670afd9236d229a46e0f9cf519db0cd829c6dca820bb5a5c3def584ed
+  languageName: node
+  linkType: hard
+
+"console-table-printer@npm:^2.9.0":
+  version: 2.10.0
+  resolution: "console-table-printer@npm:2.10.0"
+  dependencies:
+    simple-wcswidth: ^1.0.1
+  checksum: 10c4f13d5868517b173f82c1ad9d7e41fb62b6d94184acc514053de8c2cc70af09aa0759ed06b219ad5a34d0e95740dfbd7816ffaad383807848c5988ed1e3a8
   languageName: node
   linkType: hard
 
@@ -7497,6 +7507,17 @@ fsevents@~2.1.1:
   peerDependencies:
     hardhat: ^2.0.2
   checksum: c8c1d79bfbb6956cabbe5563e0f40c3bb7f2227a3c278f9afe73bc8f44125440e1b1f7ab60f5280b93ed8ae8f748dad73d7bbca892074f5f1edf026394c8ee09
+  languageName: node
+  linkType: hard
+
+"hardhat-storage-layout@npm:^0.1.6":
+  version: 0.1.6
+  resolution: "hardhat-storage-layout@npm:0.1.6"
+  dependencies:
+    console-table-printer: ^2.9.0
+  peerDependencies:
+    hardhat: ^2.0.3
+  checksum: 041041582ca32ccce90a71a8c243c8cbf0cb09d908fcf69e3994b2805b84f37310cc825ad63ad47ccb803260a6c94237881b2ed9098ac4704e022c19045cd075
   languageName: node
   linkType: hard
 
@@ -12666,6 +12687,13 @@ resolve@1.1.x:
     once: ^1.3.1
     simple-concat: ^1.0.0
   checksum: 8e9f33e81a9ae3b6eaa2d3b70a6c6cbe50c1163bfed902cde7768434cd0332c13bd9814446832e4d56c78f5116c1b766f19fd8f66a00c040d7227396ba4ea4be
+  languageName: node
+  linkType: hard
+
+"simple-wcswidth@npm:^1.0.1":
+  version: 1.0.1
+  resolution: "simple-wcswidth@npm:1.0.1"
+  checksum: dc5bf4cb131d9c386825d1355add2b1ecc408b37dc2c2334edd7a1a4c9f527e6b594dedcdbf6d949bce2740c3a332e39af1183072a2d068e40d9e9146067a37f
   languageName: node
   linkType: hard
 
