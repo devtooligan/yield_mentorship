@@ -24,12 +24,13 @@ contract MultiCollateralVault {
     event Liquidate(address indexed guy, uint256 loanDaiAmt);
     event AddAcceptedToken(address indexed token);
 
-    // @dev Deploy with addresses of Dai Stablecoin token
+    // @dev Deploy with address of Dai Stablecoin token and optionally intialTokens / associated aggregators
     constructor(
         address _daiToken,
         address[] memory initialTokens,
         address[] memory initialFeeds
     ) {
+        require(initialTokens.length == initialFeeds.length, "Mismatched arg lengths");
         owner = msg.sender;
         daiToken = _daiToken;
         for (uint256 idx = 0; idx < initialTokens.length; idx++) {
@@ -51,29 +52,6 @@ contract MultiCollateralVault {
         uint8 decimals = feed.decimals();
         require(answer > 0 && decimals > 0, "Invalid data");
         return uint256(answer) * 1**(18 - decimals);
-    }
-
-    //@notice Function used to get latest dai/token exchange from price feed and convert an amount to Dai
-    //@param _token ERC20 token address to get rate for
-    //@param _wad amount to convert
-    function _getAndApplyExchangeRate(address _token, uint256 _wad) internal view returns (uint256) {
-        return (_wad * 1e18) / _getExchangeRate(_token);
-    }
-
-    //@notice Function used to total all deposits for a user converted to Dai
-    //@param guy The guy for whom the deposits are being totaled
-    function _calculateTotalDepositsDaiValue(address guy) internal view returns (uint256 _daiWad) {
-        uint256 daiTotal = 0;
-        for (uint256 idx = 0; idx < tokensAcceptedArray.length; idx++) {
-            address token = tokensAcceptedArray[idx];
-            uint256 currentDeposit = deposits[guy][token];
-            uint256 daiWad;
-            if (currentDeposit > 0) {
-                daiWad = _getAndApplyExchangeRate(token, currentDeposit);
-                daiTotal = daiTotal + daiWad;
-            }
-        }
-        return daiTotal;
     }
 
     //@notice Function used to deposit ERC20 tokens
@@ -101,6 +79,22 @@ contract MultiCollateralVault {
         emit Withdraw(_token, _wad);
     }
 
+    //@notice Function used to total all deposits for a user converted to Dai
+    //@param guy The guy for whom the deposits are being totaled
+    function _calculateTotalDepositsDaiValue(address guy) internal view returns (uint256 _daiWad) {
+        uint256 daiTotal = 0;
+        for (uint256 idx = 0; idx < tokensAcceptedArray.length; idx++) {
+            address token = tokensAcceptedArray[idx];
+            uint256 currentDeposit = deposits[guy][token];
+            uint256 daiWad;
+            if (currentDeposit > 0) {
+                daiWad = (currentDeposit * 1e18) / _getExchangeRate(token);
+                daiTotal = daiTotal + daiWad;
+            }
+        }
+        return daiTotal;
+    }
+
     //@notice Function used to borrow dai collateralized by eth deposit
     function borrow(uint256 _daiWad) external {
         require(_daiWad > 0, "Amount > 0 required");
@@ -123,6 +117,7 @@ contract MultiCollateralVault {
 
     //@notice Function used to liquidate
     function liquidate(address guy) external {
+        require(msg.sender == owner, "Unauthorized");
         uint256 _depositsDaiValue = _calculateTotalDepositsDaiValue(guy);
         uint256 _loanDai = loans[guy];
         require(_loanDai > _depositsDaiValue, "Loan safe");
