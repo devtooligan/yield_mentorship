@@ -35,9 +35,8 @@ contract MultiCollateralVault {
         daiToken = _daiToken;
         for (uint256 idx = 0; idx < initialTokens.length; idx++) {
             address token = initialTokens[idx];
-            address feed = initialFeeds[idx];
             tokensAcceptedMapping[token] = true;
-            priceFeeds[token] = AggregatorV3Interface(feed);
+            priceFeeds[token] = AggregatorV3Interface(initialFeeds[idx]);
         }
         tokensAcceptedArray = initialTokens;
     }
@@ -69,12 +68,12 @@ contract MultiCollateralVault {
     function withdraw(address _token, uint256 _wad) external {
         require(tokensAcceptedMapping[_token], "Invalid token");
         require(_wad > 0, "Amount > 0 required");
-        uint256 _deposit = deposits[msg.sender][_token];
+        uint256 tokenDeposit = deposits[msg.sender][_token];
         uint256 rate = _getExchangeRate(_token);
-        uint256 _depositDaiValue = ((_deposit * 1e18) / rate);
+        uint256 depositDaiValue = ((tokenDeposit * 1e18) / rate);
         uint256 _withdrawDaiValue = ((_wad * 1e18) / rate);
-        require((_depositDaiValue - loans[msg.sender]) >= _withdrawDaiValue, "Insufficient balance");
-        deposits[msg.sender][_token] = _deposit - _wad;
+        require((depositDaiValue - loans[msg.sender]) >= _withdrawDaiValue, "Insufficient balance");
+        deposits[msg.sender][_token] = tokenDeposit - _wad;
         TransferHelper.safeTransferFrom(IERC20(_token), address(this), msg.sender, _wad);
         emit Withdraw(_token, _wad);
     }
@@ -86,8 +85,8 @@ contract MultiCollateralVault {
         for (uint256 idx = 0; idx < tokensAcceptedArray.length; idx++) {
             address token = tokensAcceptedArray[idx];
             uint256 currentDeposit = deposits[guy][token];
-            uint256 daiWad;
             if (currentDeposit > 0) {
+                uint256 daiWad;
                 daiWad = (currentDeposit * 1e18) / _getExchangeRate(token);
                 daiTotal = daiTotal + daiWad;
             }
