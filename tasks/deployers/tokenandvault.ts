@@ -12,9 +12,7 @@ task("deploy:DaiAndMultiCollateralVault").setAction(async function (taskArgument
   const multiCollateralVaultFactory: MultiCollateralVault__factory = await ethers.getContractFactory(
     "MultiCollateralVault",
   );
-  const vault: MultiCollateralVault = <MultiCollateralVault>(
-    await multiCollateralVaultFactory.deploy(dai.address, [], [])
-  );
+  const vault: MultiCollateralVault = <MultiCollateralVault>await multiCollateralVaultFactory.deploy(dai.address);
   await vault.deployed();
   console.log("Vault deployed to: ", vault.address);
 });

@@ -11,9 +11,8 @@ const { parseEther } = hre.ethers.utils;
 
 const WAD = BigNumber.from("1" + "0".repeat(18));
 
-const rateInvertWad = (tokenRate: number) => {
-  const daiTokenRate = Math.round((1.0 / tokenRate) * 1e18).toString();
-  return BigNumber.from(daiTokenRate);
+const rateInvert = (tokenRate: number, decimals: number) => {
+  return BigNumber.from(Math.round((1.0 / tokenRate) * 10.0 ** decimals).toString());
 };
 
 describe("MultiCollateralVault Unit tests", function () {
@@ -23,13 +22,10 @@ describe("MultiCollateralVault Unit tests", function () {
   let user2: SignerWithAddress; // assigned to this.signers[2]
 
   const initialToolieDaiExchangeRate = 10.0;
-  const initialUsdToolieExchangeRateWad = rateInvertWad(initialToolieDaiExchangeRate);
+  const initialUsdToolieExchangeRateInverted = rateInvert(initialToolieDaiExchangeRate, 20);
 
   const initialEthDaiExchangeRate = 4000.0;
-  const initialDaiEthExchangeRateWad = rateInvertWad(initialEthDaiExchangeRate);
-
-  const initialLinkUsdExchangeRate = 35.0;
-  const initialUsdLinkExchangeRateWad = rateInvertWad(initialLinkUsdExchangeRate);
+  const initialDaiEthExchangeRateInverted = rateInvert(initialEthDaiExchangeRate, 8);
 
   const vaultStartingDai = WAD.mul(2000000);
   const user1StartingToolie = WAD.mul("100");
@@ -38,12 +34,9 @@ describe("MultiCollateralVault Unit tests", function () {
   const user1StartingWeth = WAD.mul("5");
   const user2StartingWeth = WAD.mul("6");
 
-  const user1StartingLink = WAD.mul("500");
-  const user2StartingLink = WAD.mul("600");
-
   const depositWeth1 = WAD.div("2");
-  const depositToolie2 = WAD.mul("40");
-  const borrowDai1 = depositWeth1.div(initialDaiEthExchangeRateWad).mul(WAD);
+  const depositToolie2 = WAD.mul("2");
+  const borrowDai1 = depositWeth1.mul(initialEthDaiExchangeRate);
   let borrowDai2: BigNumber;
 
   before(async function () {
@@ -72,31 +65,19 @@ describe("MultiCollateralVault Unit tests", function () {
 
     this.MockPriceFeedAggregatorDaiEth = <MockPriceFeedAggregator>(
       await deployContract(this.signers.admin, await hre.artifacts.readArtifact("MockPriceFeedAggregator"), [
-        initialDaiEthExchangeRateWad,
-        18,
+        initialDaiEthExchangeRateInverted,
+        8,
       ])
     );
     this.MockPriceFeedAggregatorUsdToolie = <MockPriceFeedAggregator>(
       await deployContract(this.signers.admin, await hre.artifacts.readArtifact("MockPriceFeedAggregator"), [
-        initialUsdToolieExchangeRateWad,
-        8,
-      ])
-    );
-    this.MockPriceFeedAggregatorUsdLink = <MockPriceFeedAggregator>(
-      await deployContract(this.signers.admin, await hre.artifacts.readArtifact("MockPriceFeedAggregator"), [
-        initialUsdLinkExchangeRateWad,
-        8,
+        initialUsdToolieExchangeRateInverted,
+        20,
       ])
     );
     this.vault = <MultiCollateralVault>(
       await deployContract(this.signers.admin, await hre.artifacts.readArtifact("MultiCollateralVault"), [
         this.dai.address,
-        [this.wethToken.address, this.toolieToken.address, this.linkToken.address],
-        [
-          this.MockPriceFeedAggregatorDaiEth.address,
-          this.MockPriceFeedAggregatorUsdToolie.address,
-          this.MockPriceFeedAggregatorUsdLink.address,
-        ],
       ])
     );
     // Fund the vault with some dai
@@ -109,8 +90,12 @@ describe("MultiCollateralVault Unit tests", function () {
     await this.wethToken.mint(user1.address, user1StartingWeth);
     await this.wethToken.mint(user2.address, user2StartingWeth);
 
-    await this.linkToken.mint(user1.address, user1StartingLink);
-    await this.linkToken.mint(user2.address, user2StartingLink);
+    this.vault
+      .connect(this.signers.admin)
+      .addAcceptedToken(this.toolieToken.address, this.MockPriceFeedAggregatorUsdToolie.address);
+    this.vault
+      .connect(this.signers.admin)
+      .addAcceptedToken(this.wethToken.address, this.MockPriceFeedAggregatorDaiEth.address);
   });
   describe("without deposits or loans", function () {
     it("#withdraw() should not be able to withdraw without a deposit", async function () {
@@ -154,8 +139,8 @@ describe("MultiCollateralVault Unit tests", function () {
       await this.wethToken.connect(user2).approve(this.vault.address, depositWeth1);
       await this.vault.connect(user2).deposit(this.wethToken.address, depositWeth1);
 
-      const wethDaiAmount = depositWeth1.div(initialDaiEthExchangeRateWad).mul(WAD);
-      const toolieDaiAmount = depositToolie2.div(initialUsdToolieExchangeRateWad).mul(WAD);
+      const wethDaiAmount = depositWeth1.mul(initialEthDaiExchangeRate);
+      const toolieDaiAmount = depositToolie2.mul(initialToolieDaiExchangeRate);
       borrowDai2 = wethDaiAmount.add(toolieDaiAmount);
     });
 
@@ -202,8 +187,8 @@ describe("MultiCollateralVault Unit tests", function () {
     });
     describe("with loans", function () {
       beforeEach(async function () {
-        const wethDaiAmount = depositWeth1.div(initialDaiEthExchangeRateWad).mul(WAD);
-        const toolieDaiAmount = depositToolie2.div(initialUsdToolieExchangeRateWad).mul(WAD);
+        const wethDaiAmount = depositWeth1.mul(initialEthDaiExchangeRate);
+        const toolieDaiAmount = depositToolie2.mul(initialToolieDaiExchangeRate);
 
         borrowDai2 = wethDaiAmount.add(toolieDaiAmount).sub(WAD); // Borrow everything except for 1
 
@@ -221,8 +206,8 @@ describe("MultiCollateralVault Unit tests", function () {
 
       it("#borrow() should not be able to borrow beyond available collateral", async function () {
         await expect(this.vault.connect(user1).borrow(WAD.mul(5000))).to.be.revertedWith("Insufficient collateral");
-        await expect(this.vault.connect(user2).borrow(WAD)).to.not.be.reverted; // 1 more ok
-        await expect(this.vault.connect(user2).borrow(WAD)).to.be.revertedWith("Insufficient collateral"); // but not another
+        await expect(this.vault.connect(user2).borrow(WAD)).to.not.be.reverted;
+        await expect(this.vault.connect(user2).borrow(WAD.mul(2200))).to.be.revertedWith("Insufficient collateral");
       });
 
       it("#liquidate() should not be able to liquidate safe loans", async function () {
@@ -242,8 +227,8 @@ describe("MultiCollateralVault Unit tests", function () {
       });
 
       it("#liquidate() should be able to liquidate underwater loans", async function () {
-        await this.MockPriceFeedAggregatorDaiEth.setRate(rateInvertWad(10));
-        await this.MockPriceFeedAggregatorUsdToolie.setRate(rateInvertWad(10));
+        await this.MockPriceFeedAggregatorDaiEth.setRate(rateInvert(1, 8));
+        await this.MockPriceFeedAggregatorUsdToolie.setRate(rateInvert(1, 20));
         await expect(this.vault.connect(this.signers.admin).liquidate(user1.address))
           .to.emit(this.vault, "Liquidate")
           .withArgs(user1.address, borrowDai1);
@@ -259,7 +244,7 @@ describe("MultiCollateralVault Unit tests", function () {
 
       it("#borrow() should be able to borrow additional eth if ltv drops", async function () {
         await expect(this.vault.connect(user1).borrow(1000)).to.be.revertedWith("Insufficient collateral");
-        await this.MockPriceFeedAggregatorDaiEth.setRate(rateInvertWad(20000)); // Setting eth/dai rate to $20,000
+        await this.MockPriceFeedAggregatorDaiEth.setRate(rateInvert(20000, 8)); // Setting eth/dai rate to $20,000
         await expect(this.vault.connect(user1).borrow(1000)).to.be.not.be.reverted;
       });
     });
