@@ -92,10 +92,10 @@ describe("MultiCollateralVault Unit tests", function () {
 
     this.vault
       .connect(this.signers.admin)
-      .addAcceptedToken(this.toolieToken.address, this.MockPriceFeedAggregatorUsdToolie.address);
+      .setAcceptedToken(this.toolieToken.address, this.MockPriceFeedAggregatorUsdToolie.address);
     this.vault
       .connect(this.signers.admin)
-      .addAcceptedToken(this.wethToken.address, this.MockPriceFeedAggregatorDaiEth.address);
+      .setAcceptedToken(this.wethToken.address, this.MockPriceFeedAggregatorDaiEth.address);
   });
   describe("without deposits or loans", function () {
     it("#withdraw() should not be able to withdraw without a deposit", async function () {
@@ -200,7 +200,7 @@ describe("MultiCollateralVault Unit tests", function () {
 
       it("#withdraw() should not be able to withdraw deposits being used as collateral", async function () {
         await expect(this.vault.connect(user1).withdraw(this.wethToken.address, depositWeth1)).to.be.revertedWith(
-          "Insufficient balance",
+          "Insufficient collateral",
         );
       });
 
@@ -246,6 +246,16 @@ describe("MultiCollateralVault Unit tests", function () {
         await expect(this.vault.connect(user1).borrow(1000)).to.be.revertedWith("Insufficient collateral");
         await this.MockPriceFeedAggregatorDaiEth.setRate(rateInvert(20000, 8)); // Setting eth/dai rate to $20,000
         await expect(this.vault.connect(user1).borrow(1000)).to.be.not.be.reverted;
+      });
+
+      it("#withdraw() should be able to deposits in excess of collateral", async function () {
+        // User2 has 0.5 weth (2000 dai) and 2 toolies (20 dai) on deposit for 2020 dai in deposits
+        // total loan dai value is 2019 dai, so if he withdraws 0.1 toolie he should be good, but not another 0.1
+        await expect(this.vault.connect(user2).withdraw(this.toolieToken.address, parseEther("0.1"))).to.not.be
+          .reverted;
+        await expect(
+          this.vault.connect(user2).withdraw(this.toolieToken.address, parseEther("0.1")),
+        ).to.be.revertedWith("Insufficient collateral");
       });
     });
   });
