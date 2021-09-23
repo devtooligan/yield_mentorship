@@ -113,7 +113,8 @@ describe("MultiCollateralVault Unit tests", function () {
       await expect(this.vault.connect(user1).deposit(this.wethToken.address, depositWeth1))
         .to.emit(this.vault, "Deposit")
         .withArgs(this.wethToken.address, depositWeth1);
-
+      const tokenDeposited = await this.vault.tokensDeposited(user1.address, 0);
+      expect(tokenDeposited).is.equal(this.wethToken.address);
       const deposits1 = await this.vault.deposits(user1.address, this.wethToken.address);
       expect(deposits1).to.be.equal(depositWeth1);
       await this.toolieToken.connect(user2).approve(this.vault.address, depositToolie2);
@@ -156,13 +157,16 @@ describe("MultiCollateralVault Unit tests", function () {
     });
 
     it("#withdraw() should be able to withdraw up to the deposited amount", async function () {
+      const tokenDepositedBefore = await this.vault.tokensDeposited(user1.address, 0);
+      expect(tokenDepositedBefore).is.equal(this.wethToken.address);
+
       // User1 withdraws entire deposit
       await expect(this.vault.connect(user1).withdraw(this.wethToken.address, depositWeth1))
         .to.emit(this.vault, "Withdraw")
         .withArgs(this.wethToken.address, depositWeth1);
       expect(await this.vault.deposits(user1.address, this.wethToken.address)).to.be.equal(0);
+      await expect(this.vault.tokensDeposited(user1.address, 0)).to.be.reverted;
 
-      // User2 withdraws leaving 0.5 weth in the account
       await this.vault.connect(user2).withdraw(this.wethToken.address, depositWeth1.sub(parseEther("0.05")));
       expect(await this.vault.deposits(user2.address, this.wethToken.address)).to.be.equal(parseEther("0.05"));
 
