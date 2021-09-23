@@ -12,7 +12,7 @@ import {
   AMMRouter__factory,
 } from "../../typechain";
 
-task("deploy:TokenAndVault4WithOracle").setAction(async function (taskArguments: TaskArguments, { ethers }) {
+task("deploy:AMM").setAction(async function (taskArguments: TaskArguments, { ethers }) {
   const daiFactory: Dai__factory = await ethers.getContractFactory("Dai");
   const { chainId } = await ethers.provider.getNetwork();
   const dai: Dai = <Dai>await daiFactory.deploy(chainId);
